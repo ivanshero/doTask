@@ -1,0 +1,9 @@
+/* style.css: Custom styles and overrides for the system */
+
+body {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+}
+
+#sidebar-wrapper {
+  min-height: 100vh;
+}
