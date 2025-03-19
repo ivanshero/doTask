@@ -1,160 +1,119 @@
 <?php
-// Ensure session is started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+session_start();
 
-// Check if user is logged in
-if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
+// Check if user is logged in (for pages that require authentication)
+if (!isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) != 'login.php') {
+    header('Location: login.php');
     exit;
 }
 
-// Get user information from database
-require_once('db_connect.php');
-$stmt = $pdo->prepare("SELECT username, full_name, role, avatar FROM users WHERE user_id = ?");
-$stmt->execute([$_SESSION['user_id']]);
-$user = $stmt->fetch();
-
-// Get unread notifications count
-$stmt = $pdo->prepare("SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = 0");
-$stmt->execute([$_SESSION['user_id']]);
-$notifications = $stmt->fetch();
-$notif_count = $notifications['count'] ?? 0;
-
-// Get current page for active menu highlighting
-$current_page = basename($_SERVER['PHP_SELF']);
+// Demo user data (in real application, get this from database)
+$userData = [
+    'id' => 1,
+    'name' => 'مدير النظام',
+    'email' => 'admin@dotask.com',
+    'avatar' => 'https://via.placeholder.com/150',
+    'role' => 'مدير',
+    'notifications' => [
+        ['id' => 1, 'text' => 'فشل في مهمة "تحديث البيانات"', 'time' => '10 دقائق', 'type' => 'error'],
+        ['id' => 2, 'text' => 'استلام البيانات الجديدة بنجاح', 'time' => '30 دقيقة', 'type' => 'success'],
+        ['id' => 3, 'text' => 'تم النسخ الاحتياطي بنجاح', 'time' => '2 ساعة', 'type' => 'info'],
+    ]
+];
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام الإدارة والأتمتة الذكي</title>
+    <title>doTask - نظام إدارة وأتمتة ذكي للمواقع</title>
+    
     <!-- Bootstrap RTL CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
-    <!-- Bootstrap Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" integrity="sha384-nU14brUcp6StFntEOOEBvcJm4huWjB0OcIeQ3fltAfSmuZFrkAif0T+UtNGlKKQv" crossorigin="anonymous">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    
     <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
-    <!-- Custom CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Custom styles -->
     <link rel="stylesheet" href="css/style.css">
-    <!-- Load theme preference -->
-    <script>
-        // Check for saved theme preference or OS preference
-        const theme = localStorage.getItem('theme') || 
-                     (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        
-        // Apply theme class to document
-        if (theme === 'dark') {
-            document.documentElement.setAttribute('data-bs-theme', 'dark');
-        } else {
-            document.documentElement.setAttribute('data-bs-theme', 'light');
-        }
-    </script>
 </head>
 <body>
-<!-- Top navigation bar -->
-<nav class="navbar navbar-expand-lg sticky-top navbar-dark bg-primary">
-    <div class="container-fluid">
-        <!-- Sidebar toggle button (for mobile) -->
-        <button class="btn btn-link text-white d-lg-none me-2" id="sidebarToggle">
-            <i class="bi bi-list fs-4"></i>
-        </button>
-
-        <!-- Brand/logo -->
-        <a class="navbar-brand d-flex align-items-center" href="dashboard.php">
-            <img src="img/logo.svg" alt="Logo" height="30" class="d-inline-block me-2">
-            <span>نظام الإدارة والأتمتة الذكي</span>
-        </a>
-
-        <!-- Search form -->
-        <form class="d-none d-md-flex ms-auto me-3" role="search">
-            <div class="input-group">
-                <input class="form-control" type="search" placeholder="بحث سريع..." aria-label="Search">
-                <button class="btn btn-outline-light" type="submit">
-                    <i class="bi bi-search"></i>
-                </button>
-            </div>
-        </form>
-
-        <!-- Right navbar items -->
-        <ul class="navbar-nav align-items-center">
-            <!-- Theme toggler -->
-            <li class="nav-item me-3">
-                <button id="themeToggle" class="btn btn-link nav-link text-white">
-                    <i class="bi bi-sun-fill theme-icon-light"></i>
-                    <i class="bi bi-moon-fill theme-icon-dark"></i>
-                </button>
-            </li>
-
-            <!-- Fullscreen toggle -->
-            <li class="nav-item me-3">
-                <button id="fullscreenToggle" class="btn btn-link nav-link text-white">
-                    <i class="bi bi-arrows-fullscreen"></i>
-                </button>
-            </li>
-
-            <!-- Notifications dropdown -->
-            <li class="nav-item dropdown me-3">
-                <a class="nav-link position-relative" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="bi bi-bell fs-5"></i>
-                    <?php if ($notif_count > 0): ?>
-                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                        <?php echo $notif_count; ?>
-                    </span>
-                    <?php endif; ?>
-                </a>
-                <ul class="dropdown-menu dropdown-menu-end notification-dropdown">
-                    <li>
-                        <div class="dropdown-header d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0">الإشعارات</h6>
-                            <?php if ($notif_count > 0): ?>
-                            <a href="#" class="text-decoration-none small">تعيين الكل كمقروء</a>
-                            <?php endif; ?>
-                        </div>
-                    </li>
-                    <li><hr class="dropdown-divider"></li>
-                    
-                    <?php
-                    // Get recent notifications
-                    $stmt = $pdo->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 5");
-                    $stmt->execute([$_SESSION['user_id']]);
-                    $notifications = $stmt->fetchAll();
-                    
-                    if (count($notifications) > 0):
-                        foreach ($notifications as $notification):
-                            $icon_class = '';
-                            switch ($notification['type']) {
-                                case 'success': $icon_class = 'bi-check-circle text-success'; break;
-                                case 'warning': $icon_class = 'bi-exclamation-triangle text-warning'; break;
-                                case 'danger': $icon_class = 'bi-x-circle text-danger'; break;
-                                default: $icon_class = 'bi-bell text-primary';
-                            }
-                    ?>
-                    <li>
-                        <a class="dropdown-item d-flex align-items-center" href="<?php echo $notification['link']; ?>">
-                            <div class="notification-icon me-3">
-                                <i class="bi <?php echo $icon_class; ?> fs-5"></i>
-                            </div>
-                            <div>
-                                <p class="mb-1 fw-bold"><?php echo htmlspecialchars($notification['title']); ?></p>
-                                <p class="mb-0 small text-muted"><?php echo htmlspecialchars($notification['message']); ?></p>
-                                <small class="text-muted"><?php echo date('Y-m-d H:i', strtotime($notification['created_at'])); ?></small>
-                            </div>
+    <!-- Top Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="dashboard.php">
+                <i class="fas fa-tasks me-2"></i>doTask
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarTop">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarTop">
+                <form class="d-flex mx-auto" style="max-width: 400px;">
+                    <div class="input-group">
+                        <input class="form-control" type="search" placeholder="البحث في النظام..." aria-label="Search">
+                        <button class="btn btn-outline-light" type="submit"><i class="fas fa-search"></i></button>
+                    </div>
+                </form>
+                
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                    <!-- Notifications -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownNotifications" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-bell"></i>
+                            <span class="badge rounded-pill bg-danger"><?= count($userData['notifications']) ?></span>
                         </a>
-                    </li>
-                    <?php 
-                        endforeach;
-                    else:
-                    ?>
-                    <li>
-                        <div class="text-center p-3">
-                            <i class="bi bi-bell-slash fs-4"></i>
-                            <p>لا توجد إشعارات جديدة</p>
+                        <div class="dropdown-menu dropdown-menu-end p-0" aria-labelledby="navbarDropdownNotifications" style="width: 300px;">
+                            <div class="dropdown-header bg-primary text-white py-2">
+                                الإشعارات (<?= count($userData['notifications']) ?>)
+                            </div>
+                            <div class="notification-list" style="max-height: 300px; overflow-y: auto;">
+                                <?php foreach ($userData['notifications'] as $notification): ?>
+                                    <a class="dropdown-item py-2 border-bottom" href="#">
+                                        <?php 
+                                        $iconClass = 'text-info';
+                                        $icon = 'info-circle';
+                                        
+                                        if ($notification['type'] == 'success') {
+                                            $iconClass = 'text-success';
+                                            $icon = 'check-circle';
+                                        } else if ($notification['type'] == 'error') {
+                                            $iconClass = 'text-danger';
+                                            $icon = 'exclamation-circle';
+                                        }
+                                        ?>
+                                        <i class="fas fa-<?= $icon ?> <?= $iconClass ?> me-2"></i>
+                                        <span><?= $notification['text'] ?></span>
+                                        <small class="text-muted d-block">منذ <?= $notification['time'] ?></small>
+                                    </a>
+                                <?php endforeach; ?>
+                            </div>
+                            <div class="dropdown-footer text-center py-2 border-top">
+                                <a href="#" class="text-decoration-none">عرض كل الإشعارات</a>
+                            </div>
                         </div>
                     </li>
-                    <?php endif; ?>
                     
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-
+                    <!-- User Profile -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownUser" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <img src="<?= $userData['avatar'] ?>" alt="User Avatar" class="rounded-circle me-1" style="width: 24px; height: 24px;">
+                            <?= $userData['name'] ?>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownUser">
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-user me-2"></i>حسابي</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i>الإعدادات</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="login.php?logout=1"><i class="fas fa-sign-out-alt me-2"></i>تسجيل الخروج</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Container -->
+    <div class="d-flex">
