@@ -87,32 +87,6 @@ This project aims to empower users with tools that streamline backend operations
 
 ---
 
-## 📂 Folder Structure (Frontend Phase)
-
-```
-/public
-  ├─ /assets
-  └─ index.html
-
-/src
-  ├─ /components
-  │    ├─ Sidebar
-  │    ├─ Header
-  │    ├─ TaskCards
-  │    ├─ Charts
-  │    └─ DatabaseViewer
-  ├─ /pages
-  │    ├─ Dashboard
-  │    ├─ Database
-  │    ├─ Tasks
-  │    ├─ Insights
-  │    ├─ Reports
-  │    └─ Settings
-  └─ /styles
-```
-
----
-
 ## 🧠 AI Integration Plan (Upcoming Phases)
 
 - Local lightweight language models (TinyLlama, Phi-2, etc.)
